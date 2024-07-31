@@ -1,0 +1,386 @@
+
+ SQLServer
+
+ tools
+
+ Microsoft.AspNetCore.Cors
+
+create table Employees(
+Id int IDENTITY(1,1) primary key  ,
+EmployeeNo varchar(50),
+FirstName varchar(50),
+LastName varchar(50),
+DateOfBirth Date,
+Salary float(10)
+) ;
+
+insert into Employees(EmployeeNo,FirstName,LastName,DateOfBirth,Salary) values 
+('E01','Dalin1','Arange1','1996-07-01',600000),
+('E02','Dalin2','Arange2','1996-07-02',500000),
+('E03','Dalin3','Arange3','1996-07-03',400000),
+('E04','Dalin4','Arange4','1996-07-04',300000),
+('E05','Dalin5','Arange5','1996-07-05',200000)
+;
+
+
+using Demo3.Data;
+using Demo3.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Demo3.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class EmployeeController : ControllerBase
+    {
+        private readonly EmployeeContext _context;
+
+        public EmployeeController(EmployeeContext _context)
+        {
+            this._context = _context;
+        }
+
+
+        [HttpGet]
+        public IActionResult GetEmployees()
+        {
+            var Employees = _context.Employees.ToList();
+
+            return Ok(Employees);
+
+        }
+
+        [HttpGet]
+        [Route("{id:int}")]
+        public IActionResult GetEmployeeById(int id)
+        {
+            var Employee = _context.Employees.Find(id);
+
+            if(Employee is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(Employee);
+
+        }
+
+        [HttpPost]
+        public IActionResult AddEmployee(AddEmployeeDTO addEmployeeDto)
+        {
+            var employeeEntity = new Employee()
+            {
+                EmployeeNo = addEmployeeDto.EmployeeNo,
+                FirstName = addEmployeeDto.FirstName,
+                LastName = addEmployeeDto.LastName,
+                DateOfBirth = addEmployeeDto.DateOfBirth,
+                Salary = addEmployeeDto.Salary,
+
+            };
+            _context.Employees.Add(employeeEntity);
+            _context.SaveChanges();
+            return Ok(employeeEntity);
+
+
+        }
+
+        [HttpPut]
+        [Route("{Id:int}")]
+        public IActionResult UpdateEmployee(int Id,UpdateEmployeeDTO updateEmployeeDto)
+        {
+            var employee = _context.Employees.Find(Id);
+
+            if (employee is null)
+            {
+                return NotFound();
+            }
+            employee.EmployeeNo = updateEmployeeDto.EmployeeNo;
+            employee.FirstName = updateEmployeeDto.FirstName;
+            employee.LastName = updateEmployeeDto.LastName;
+            employee.DateOfBirth = updateEmployeeDto.DateOfBirth;
+            employee.Salary = updateEmployeeDto.Salary;
+
+            _context.SaveChanges();
+            return Ok(employee);
+
+
+        }
+
+        [HttpDelete]
+        [Route("{Id:int}")]
+        public IActionResult DeleteEmployee(int Id)
+        {
+            var employee = _context.Employees.Find(Id);
+
+            if (employee is null)
+            {
+                return NotFound();
+            }
+
+            _context.Employees.Remove(employee);
+            _context.SaveChanges();
+            return Ok(employee);
+
+
+        }
+
+        [HttpGet]
+        [Route("averageSalary")]
+        public IActionResult AverageEmployeeSalary()
+        {
+            var AllEmployees = _context.Employees.ToList();
+
+            if (AllEmployees.Count ==0)
+            {
+                return Ok(new { Employee = AllEmployees, AverageSalary = 0 });
+            }
+            var AverageSalary = _context.Employees.Average(e => e.Salary);
+            return Ok(AverageSalary);
+
+        }
+    }
+}
+
+
+
+using Demo3.Data;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+
+builder.Services.AddControllers();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(builder =>
+    {
+        builder.WithOrigins("http://127.0.0.1:5500")
+               .AllowAnyHeader()
+               .AllowAnyMethod();
+    });
+});
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<EmployeeContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseCors();
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": { "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=employee;;Trusted_Connection=True;MultipleActiveResultSets=true" },
+  "AllowedHosts": "*"
+}
+
+
+
+$(function () {
+    // Function to fetch and display data
+    function fetchData() {
+        $.when(
+            $.ajax({
+                type: 'GET',
+                url: 'http://localhost:5232/api/Employee'
+            }),
+            $.ajax({
+                type: 'GET',
+                url: 'http://localhost:5232/api/Employee/averageSalary'
+            })
+        ).done(function (studentsData, averageSalaryData) {
+            // Process student data
+            var tableBody = $('#employeeTable tbody');
+            tableBody.empty(); // Clear any existing data
+
+            studentsData[0].forEach(function (item) {
+                var row = `<tr data-id="${item.id}">
+                    <td>${item.employeeNo}</td>
+                    <td>${item.firstName}</td>
+                    <td>${item.lastName}</td>
+                    <td>${item.dateOfBirth}</td>
+                    <td>${item.salary}</td>
+                    <td>
+                        <button class="edit-btn">Edit</button>
+                        <button class="delete-btn">Delete</button>
+                    </td>
+                </tr>`;
+                tableBody.append(row);
+            });
+
+            // Process average salary data
+            var averageSalary = averageSalaryData[0];
+            $('#employeeGrid h1').text('Average Salary: ' + averageSalary);
+
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            console.error('Error fetching data:', textStatus, errorThrown);
+        });
+    }
+
+    // Fetch and display data when the page loads
+    fetchData();
+
+    // Handle form submission
+    $('#employeeForm').on('submit', function(event) {
+        event.preventDefault();
+
+        // Gather form data
+        var employeeData = {
+            id: $('#id').val(),
+            employeeNo: $('#empNo').val(),
+            firstName: $('#firstName').val(),
+            lastName: $('#lastName').val(),
+            dateOfBirth: $('#dob').val(),
+            salary: $('#salary').val()
+        };
+
+        // Determine if we are updating or creating a new record
+        var requestType = employeeData.id ? 'PUT' : 'POST';
+        var url = employeeData.id 
+            ? `http://localhost:5232/api/Employee/${employeeData.id}` 
+            : 'http://localhost:5232/api/Employee';
+
+        // Send request
+        $.ajax({
+            type: requestType,
+            url: url,
+            contentType: 'application/json',
+            data: JSON.stringify(employeeData),
+            success: function(response) {
+                console.log('Employee saved:', response);
+                fetchData(); // Refresh the data table
+                $('#employeeForm')[0].reset(); // Clear form
+            },
+            error: function(error) {
+                console.error('Error:', error);
+            }
+        });
+    });
+
+    // Handle edit button click
+    $('#employeeTable').on('click', '.edit-btn', function() {
+        var row = $(this).closest('tr');
+        var employeeId = row.data('id');
+
+        $.ajax({
+            type: 'GET',
+            url: `http://localhost:5232/api/Employee/${employeeId}`,
+            success: function(employee) {
+                $('#id').val(employee.id);
+                $('#empNo').val(employee.employeeNo);
+                $('#firstName').val(employee.firstName);
+                $('#lastName').val(employee.lastName);
+                $('#dob').val(employee.dateOfBirth);
+                $('#salary').val(employee.salary);
+            },
+            error: function(error) {
+                console.error('Error fetching employee:', error);
+            }
+        });
+    });
+
+    // Handle delete button click
+    $('#employeeTable').on('click', '.delete-btn', function() {
+        var row = $(this).closest('tr');
+        var employeeId = row.data('id');
+
+        if (confirm('Are you sure you want to delete this employee?')) {
+            $.ajax({
+                type: 'DELETE',
+                url: `http://localhost:5232/api/Employee/${employeeId}`,
+                success: function(response) {
+                    console.log('Employee deleted:', response);
+                    fetchData(); // Refresh the data table
+                },
+                error: function(error) {
+                    console.error('Error deleting employee:', error);
+                }
+            });
+        }
+    });
+});
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee List</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="main.js"></script>
+</head>
+<body>
+    <h1>EMployee List</h1>
+    <form id="employeeForm">
+        <input type="hidden" id="Id">
+        <label for="empNo">Employee No</label>
+        <input type="text" id="empNo" name="empNo" required><br>
+
+        <label for="firstName">Firt Name</label>
+        <input type="text" id="firstName" name="firstName" required><br>
+
+        <label for="lastName">Last Name</label>
+        <input type="text" id="lastName" name="lastName" required><br>
+
+        <label for="dob">Date Of Birth</label>
+        <input type="date" id="dob" name="dob" required><br>
+
+        <label for="salary">Salary </label>
+        <input type="number" id="salary" name="salary" required><br>
+        <button type="submit">Submit</button>
+
+    </form>
+
+    <h1>EMployee List</h1>
+
+    <div id="employeeGrid">
+        <table id="employeeTable" border="1">
+            <thead>
+                <tr>
+                    <th>Employee No</th>
+                    <th>First Name</th>
+                    <th>Last name</th>
+                    <th>Date Of Birth</th>
+                    <th>Salary</th>
+                    
+                </tr>
+            </thead>
+            <tbody>
+                
+            </tbody>
+        </table>
+        <h1>Average Salary : </h1>
+
+    </div>
+
+    
+    
+</body>
+</html>
